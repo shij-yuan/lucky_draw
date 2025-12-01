@@ -203,13 +203,13 @@ button {
 
 .wheel-pointer {
   position: absolute;
-  top: -15px;
+  top: -8px;
   left: 50%;
   transform: translateX(-50%);
-  width: 30px;
-  height: 45px;
+  width: 20px;
+  height: 42px;
   z-index: 10;
-  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.15));
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.25));
 }
 
 .wheel-wrapper {
@@ -255,7 +255,7 @@ button {
 }
 
 .wheel-center-text {
-  font-size: 0.75rem;
+  font-size: 1.5rem;
   font-weight: 600;
   color: var(--color-accent);
   text-transform: uppercase;
@@ -591,13 +591,13 @@ button {
   }
   
   .wheel-center-text {
-    font-size: 0.625rem;
+    font-size: 1.25rem;
   }
   
   .wheel-pointer {
-    width: 24px;
-    height: 36px;
-    top: -12px;
+    width: 14px;
+    height: 35px;
+    top: -6px;
   }
 }
 
@@ -643,4 +643,18 @@ button {
 
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(0, 0, 0, 0.2);
+}
+
+/* Copyright */
+.copyright {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  text-align: center;
+  padding: 0.75rem;
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  opacity: 0.6;
+  background: linear-gradient(transparent, var(--color-bg));
 }

@@ -4,20 +4,20 @@
  * Supports both D1 database (when deployed) and localStorage (fallback)
  */
 
-// Fresh color palette for wheel segments
+// Medium saturation color palette for wheel segments
 const WHEEL_COLORS = [
-  '#3b82f6', // Blue
-  '#10b981', // Emerald
-  '#f59e0b', // Amber
-  '#ef4444', // Red
-  '#8b5cf6', // Violet
-  '#ec4899', // Pink
-  '#06b6d4', // Cyan
-  '#84cc16', // Lime
-  '#f97316', // Orange
-  '#6366f1', // Indigo
-  '#14b8a6', // Teal
-  '#a855f7', // Purple
+  '#60a5fa', // Blue
+  '#4ade80', // Green
+  '#fbbf24', // Amber
+  '#f87171', // Red
+  '#a78bfa', // Violet
+  '#f472b6', // Pink
+  '#22d3ee', // Cyan
+  '#a3e635', // Lime
+  '#fb923c', // Orange
+  '#818cf8', // Indigo
+  '#2dd4bf', // Teal
+  '#c084fc', // Purple
 ];
 
 // Default prize configuration (no emoji, auto colors)
@@ -303,8 +303,8 @@ class PhysicsWheel {
     
     this.rotation = 0;
     this.angularVelocity = 0;
-    this.friction = 0.985;
-    this.minVelocity = 0.03;
+    this.friction = 0.992;
+    this.minVelocity = 0.02;
     
     this.isDragging = false;
     this.lastAngle = 0;
@@ -406,13 +406,13 @@ class PhysicsWheel {
       
       ctx.translate(textX, textY);
       
-      ctx.fillStyle = '#fff';
+      ctx.fillStyle = '#1f2937';
       const fontSize = Math.max(12, Math.min(16, this.radius / 12));
       ctx.font = `600 ${fontSize}px 'Outfit', sans-serif`;
       ctx.textBaseline = 'middle';
       ctx.textAlign = 'center';
-      ctx.shadowColor = 'rgba(0,0,0,0.3)';
-      ctx.shadowBlur = 3;
+      ctx.shadowColor = 'rgba(255,255,255,0.6)';
+      ctx.shadowBlur = 2;
       
       // Rotate text to follow the segment direction (radial)
       ctx.rotate(midAngle);
@@ -705,12 +705,10 @@ function renderHistory() {
   
   container.innerHTML = history.map(record => {
     const date = new Date(record.timestamp);
-    const timeStr = date.toLocaleString('zh-CN', {
-      month: 'numeric',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const timeStr = `${year} ${month} ${day}`;
     
     return `
       <div class="history-item">
@@ -814,18 +812,15 @@ async function savePrizes() {
  * Initialize application
  */
 async function init() {
-  // Check if API is available (for D1 database)
-  await checkAPIAvailable();
-  
-  // Load data
-  prizes = await loadPrizes();
-  history = await loadHistory();
+  // First, try to load from localStorage for instant display
+  prizes = loadFromStorage(STORAGE_KEYS.PRIZES, null) || JSON.parse(JSON.stringify(DEFAULT_PRIZES));
+  history = loadFromStorage(STORAGE_KEYS.HISTORY, []);
   
   // Initialize confetti
   const confettiCanvas = document.getElementById('confetti-canvas');
   confetti = new ConfettiEffect(confettiCanvas);
   
-  // Initialize wheel
+  // Initialize wheel immediately with local data
   const canvas = document.getElementById('wheel-canvas');
   wheel = new PhysicsWheel(canvas, prizes);
   
@@ -850,7 +845,6 @@ async function init() {
   });
   document.getElementById('btn-close-history').addEventListener('click', () => hideModal('modal-history'));
   document.querySelector('#modal-history .modal-backdrop').addEventListener('click', () => hideModal('modal-history'));
-  document.getElementById('btn-clear-history').addEventListener('click', clearHistory);
   
   document.getElementById('btn-settings').addEventListener('click', () => {
     renderPrizeEditor();
@@ -864,6 +858,28 @@ async function init() {
   document.getElementById('btn-add-prize').addEventListener('click', addPrize);
   document.getElementById('btn-reset-prizes').addEventListener('click', resetPrizes);
   document.getElementById('btn-save-prizes').addEventListener('click', savePrizes);
+  
+  // Then check API and load from server in background (non-blocking)
+  checkAPIAvailable().then(async () => {
+    if (useAPI) {
+      // Load from API and update if different
+      const apiPrizes = await loadPrizes();
+      const apiHistory = await loadHistory();
+      
+      // Update prizes if API returned data
+      if (apiPrizes && apiPrizes.length > 0) {
+        prizes = apiPrizes;
+        wheel.updatePrizes(prizes);
+        renderPrizeEditor();
+      }
+      
+      // Update history if API returned data
+      if (apiHistory && apiHistory.length > 0) {
+        history = apiHistory;
+        renderHistory();
+      }
+    }
+  });
 }
 
 if (document.readyState === 'loading') {

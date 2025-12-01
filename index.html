@@ -45,14 +45,8 @@
         <div class="wheel-container">
           <!-- Pointer -->
           <div class="wheel-pointer">
-            <svg viewBox="0 0 40 60" fill="none">
-              <path d="M20 0L40 20L20 60L0 20L20 0Z" fill="url(#pointer-gradient)"/>
-              <defs>
-                <linearGradient id="pointer-gradient" x1="20" y1="0" x2="20" y2="60" gradientUnits="userSpaceOnUse">
-                  <stop offset="0%" stop-color="#3b82f6"/>
-                  <stop offset="100%" stop-color="#8b5cf6"/>
-                </linearGradient>
-              </defs>
+            <svg viewBox="0 0 24 50" fill="none">
+              <path d="M12 0L20 40L12 50L4 40L12 0Z" fill="#ef4444"/>
             </svg>
           </div>
           
@@ -60,7 +54,7 @@
           <div class="wheel-wrapper">
             <canvas id="wheel-canvas"></canvas>
             <div class="wheel-center">
-              <span class="wheel-center-text">❤️</span>
+              <span class="wheel-center-text">🎁</span>
             </div>
           </div>
         </div>
@@ -78,6 +72,11 @@
           <button class="btn btn-primary" id="btn-close-result">好耶！</button>
         </div>
       </div>
+
+      <!-- Copyright -->
+      <footer class="copyright">
+        © 2025 Shijia Made with ❤️
+      </footer>
     </main>
 
     <!-- History Modal -->
@@ -92,9 +91,6 @@
           <div class="history-list" id="history-list">
             <p class="empty-state">暂无抽奖记录</p>
           </div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-danger" id="btn-clear-history">清空记录</button>
         </div>
       </div>
     </div>

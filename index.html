@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#1a1a2e">
+  <title>幸运转盘 - Lucky Wheel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/src/styles/main.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Confetti canvas -->
+    <canvas id="confetti-canvas"></canvas>
+
+    <!-- Header -->
+    <header class="header">
+      <h1 class="logo">
+        <span class="logo-icon">🎰</span>
+        <span class="logo-text">幸运转盘</span>
+      </h1>
+      <nav class="nav-actions">
+        <button class="btn btn-ghost" id="btn-history">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <polyline points="12,6 12,12 16,14"/>
+          </svg>
+          <span>历史</span>
+        </button>
+        <button class="btn btn-ghost" id="btn-settings">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M12 1v6m0 6v6M4.22 4.22l4.24 4.24m7.08 7.08l4.24 4.24M1 12h6m6 0h6M4.22 19.78l4.24-4.24m7.08-7.08l4.24-4.24"/>
+          </svg>
+          <span>设置</span>
+        </button>
+      </nav>
+    </header>
+
+    <!-- Main content -->
+    <main class="main-content">
+      <section class="wheel-section">
+        <div class="wheel-container">
+          <!-- Pointer -->
+          <div class="wheel-pointer">
+            <svg viewBox="0 0 40 60" fill="none">
+              <path d="M20 0L40 20L20 60L0 20L20 0Z" fill="url(#pointer-gradient)"/>
+              <defs>
+                <linearGradient id="pointer-gradient" x1="20" y1="0" x2="20" y2="60" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stop-color="#3b82f6"/>
+                  <stop offset="100%" stop-color="#8b5cf6"/>
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
+          
+          <!-- Wheel -->
+          <div class="wheel-wrapper">
+            <canvas id="wheel-canvas"></canvas>
+            <div class="wheel-center">
+              <span class="wheel-center-text">转动</span>
+            </div>
+          </div>
+        </div>
+
+        <p class="wheel-hint">
+          滑动转盘开始抽奖
+        </p>
+      </section>
+
+      <!-- Result display -->
+      <div class="result-display" id="result-display" hidden>
+        <div class="result-content">
+          <h2 class="result-title">🎉 恭喜中奖</h2>
+          <p class="result-prize" id="result-prize"></p>
+          <button class="btn btn-primary" id="btn-close-result">好的</button>
+        </div>
+      </div>
+    </main>
+
+    <!-- History Modal -->
+    <div class="modal" id="modal-history" hidden>
+      <div class="modal-backdrop"></div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title">抽奖历史</h2>
+          <button class="btn-close" id="btn-close-history">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="history-list" id="history-list">
+            <p class="empty-state">暂无抽奖记录</p>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-danger" id="btn-clear-history">清空记录</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal" id="modal-settings" hidden>
+      <div class="modal-backdrop"></div>
+      <div class="modal-content modal-large">
+        <div class="modal-header">
+          <h2 class="modal-title">抽奖项目设置</h2>
+          <button class="btn-close" id="btn-close-settings">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="prize-editor">
+            <div class="prize-list" id="prize-list"></div>
+            <button class="btn btn-secondary btn-add-prize" id="btn-add-prize">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"/>
+                <line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              添加奖项
+            </button>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" id="btn-reset-prizes">恢复默认</button>
+          <button class="btn btn-primary" id="btn-save-prizes">保存设置</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
+

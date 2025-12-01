@@ -1,0 +1,13 @@
+# Cloudflare Pages configuration
+name = "lucky-draw"
+compatibility_date = "2024-01-01"
+
+# For Pages deployment
+pages_build_output_dir = "dist"
+
+# Optional: Add D1 database binding for persistent storage
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "lucky-draw-db"
+# database_id = "your-database-id"
+

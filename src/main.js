@@ -166,7 +166,7 @@ async function resetPrizesToDefault() {
 }
 
 /**
- * Confetti Effect
+ * Confetti Effect - Optimized for mobile performance
  */
 class ConfettiEffect {
   constructor(canvas) {
@@ -175,28 +175,39 @@ class ConfettiEffect {
     this.particles = [];
     this.animationId = null;
     this.isRunning = false;
+    this.colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4'];
+    
+    // Detect mobile for performance tuning
+    this.isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    this.maxParticles = this.isMobile ? 50 : 100;
+    this.spawnRate = this.isMobile ? 2 : 5;
     
     this.resize();
     window.addEventListener('resize', () => this.resize());
   }
   
   resize() {
-    this.canvas.width = window.innerWidth;
-    this.canvas.height = window.innerHeight;
+    // Use lower resolution on mobile
+    const dpr = this.isMobile ? 1 : Math.min(window.devicePixelRatio || 1, 2);
+    this.canvas.width = window.innerWidth * dpr;
+    this.canvas.height = window.innerHeight * dpr;
+    this.ctx.scale(dpr, dpr);
+    this.displayWidth = window.innerWidth;
+    this.displayHeight = window.innerHeight;
   }
   
   createParticle() {
-    const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4'];
     return {
-      x: Math.random() * this.canvas.width,
+      x: Math.random() * this.displayWidth,
       y: -20,
-      size: Math.random() * 8 + 4,
-      color: colors[Math.floor(Math.random() * colors.length)],
+      size: Math.random() * 6 + 3,
+      color: this.colors[Math.floor(Math.random() * this.colors.length)],
       speedY: Math.random() * 3 + 2,
       speedX: (Math.random() - 0.5) * 4,
       rotation: Math.random() * 360,
-      rotationSpeed: (Math.random() - 0.5) * 10,
-      shape: Math.random() > 0.5 ? 'rect' : 'circle',
+      rotationSpeed: (Math.random() - 0.5) * 8,
+      // Only use rectangles - simpler to render
+      isRect: Math.random() > 0.3,
     };
   }
   
@@ -205,21 +216,26 @@ class ConfettiEffect {
     this.isRunning = true;
     this.particles = [];
     
-    for (let i = 0; i < 100; i++) {
+    // Initial burst - fewer particles on mobile
+    const initialCount = this.isMobile ? 30 : 60;
+    for (let i = 0; i < initialCount; i++) {
       const p = this.createParticle();
-      p.y = Math.random() * this.canvas.height * 0.5;
+      p.y = Math.random() * this.displayHeight * 0.5;
       this.particles.push(p);
     }
     
+    // Slower spawn rate
     const spawnInterval = setInterval(() => {
-      for (let i = 0; i < 5; i++) {
-        this.particles.push(this.createParticle());
+      if (this.particles.length < this.maxParticles) {
+        for (let i = 0; i < this.spawnRate; i++) {
+          this.particles.push(this.createParticle());
+        }
       }
-    }, 50);
+    }, 100);
     
     setTimeout(() => {
       clearInterval(spawnInterval);
-    }, duration * 0.7);
+    }, duration * 0.6);
     
     setTimeout(() => {
       this.stop();
@@ -233,37 +249,43 @@ class ConfettiEffect {
     if (this.animationId) {
       cancelAnimationFrame(this.animationId);
     }
-    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    this.ctx.clearRect(0, 0, this.displayWidth, this.displayHeight);
   }
   
   animate() {
     if (!this.isRunning) return;
     
-    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    const ctx = this.ctx;
+    ctx.clearRect(0, 0, this.displayWidth, this.displayHeight);
     
-    this.particles = this.particles.filter(p => p.y < this.canvas.height + 20);
+    // Filter out particles that have fallen off screen
+    this.particles = this.particles.filter(p => p.y < this.displayHeight + 20);
     
-    this.particles.forEach(p => {
+    // Batch similar operations for better performance
+    for (let i = 0; i < this.particles.length; i++) {
+      const p = this.particles[i];
+      
+      // Update physics
       p.y += p.speedY;
       p.x += p.speedX;
       p.rotation += p.rotationSpeed;
       p.speedY += 0.1;
       
-      this.ctx.save();
-      this.ctx.translate(p.x, p.y);
-      this.ctx.rotate(p.rotation * Math.PI / 180);
-      this.ctx.fillStyle = p.color;
+      // Draw particle - simplified rendering
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rotation * Math.PI / 180);
+      ctx.fillStyle = p.color;
       
-      if (p.shape === 'rect') {
-        this.ctx.fillRect(-p.size / 2, -p.size / 4, p.size, p.size / 2);
+      if (p.isRect) {
+        ctx.fillRect(-p.size / 2, -p.size / 4, p.size, p.size / 2);
       } else {
-        this.ctx.beginPath();
-        this.ctx.arc(0, 0, p.size / 2, 0, Math.PI * 2);
-        this.ctx.fill();
+        // Use simple square instead of arc for better performance
+        ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
       }
       
-      this.ctx.restore();
-    });
+      ctx.restore();
+    }
     
     this.animationId = requestAnimationFrame(() => this.animate());
   }
@@ -271,6 +293,7 @@ class ConfettiEffect {
 
 /**
  * PhysicsWheel - Canvas wheel with physics-based rotation
+ * Optimized for mobile performance using offscreen canvas caching
  */
 class PhysicsWheel {
   constructor(canvas, prizes) {
@@ -281,7 +304,7 @@ class PhysicsWheel {
     this.rotation = 0;
     this.angularVelocity = 0;
     this.friction = 0.985;
-    this.minVelocity = 0.001;
+    this.minVelocity = 0.03;
     
     this.isDragging = false;
     this.lastAngle = 0;
@@ -292,20 +315,32 @@ class PhysicsWheel {
     this.isSpinning = false;
     this.onSpinEnd = null;
     
+    // Offscreen canvas for caching the wheel (performance optimization)
+    this.wheelCache = null;
+    this.wheelCacheCtx = null;
+    this.needsRedraw = true;
+    
+    // Frame timing for consistent animation
+    this.lastFrameTime = 0;
+    
     this.init();
   }
   
   init() {
     this.setupCanvas();
     this.setupEvents();
+    this.createWheelCache();
     this.draw();
     this.startAnimation();
   }
   
   setupCanvas() {
-    const dpr = window.devicePixelRatio || 1;
+    // Use a lower DPR on mobile for better performance
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const dpr = isMobile ? Math.min(window.devicePixelRatio || 1, 2) : (window.devicePixelRatio || 1);
     const rect = this.canvas.getBoundingClientRect();
     
+    this.dpr = dpr;
     this.canvas.width = rect.width * dpr;
     this.canvas.height = rect.height * dpr;
     this.ctx.scale(dpr, dpr);
@@ -313,6 +348,92 @@ class PhysicsWheel {
     this.centerX = rect.width / 2;
     this.centerY = rect.height / 2;
     this.radius = Math.min(this.centerX, this.centerY) - 4;
+    this.displayWidth = rect.width;
+    this.displayHeight = rect.height;
+    
+    this.needsRedraw = true;
+  }
+  
+  createWheelCache() {
+    // Create offscreen canvas for caching the wheel
+    this.wheelCache = document.createElement('canvas');
+    const size = (this.radius + 10) * 2;
+    this.wheelCache.width = size * this.dpr;
+    this.wheelCache.height = size * this.dpr;
+    this.wheelCacheCtx = this.wheelCache.getContext('2d');
+    this.wheelCacheCtx.scale(this.dpr, this.dpr);
+    this.cacheSize = size;
+    
+    this.drawWheelToCache();
+  }
+  
+  drawWheelToCache() {
+    const ctx = this.wheelCacheCtx;
+    const size = this.cacheSize;
+    const centerX = size / 2;
+    const centerY = size / 2;
+    
+    ctx.clearRect(0, 0, size, size);
+    
+    const segmentAngle = (2 * Math.PI) / this.prizes.length;
+    
+    this.prizes.forEach((prize, i) => {
+      // Draw segment at fixed position (rotation=0)
+      const startAngle = i * segmentAngle;
+      const endAngle = startAngle + segmentAngle;
+      const color = this.getColor(i);
+      
+      ctx.beginPath();
+      ctx.moveTo(centerX, centerY);
+      ctx.arc(centerX, centerY, this.radius, startAngle, endAngle);
+      ctx.closePath();
+      
+      ctx.fillStyle = color;
+      ctx.fill();
+      
+      ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      
+      // Draw text - always horizontal, no rotation based on position
+      ctx.save();
+      ctx.translate(centerX, centerY);
+      
+      const midAngle = startAngle + segmentAngle / 2;
+      const textRadius = this.radius * 0.65;
+      const textX = Math.cos(midAngle) * textRadius;
+      const textY = Math.sin(midAngle) * textRadius;
+      
+      ctx.translate(textX, textY);
+      
+      ctx.fillStyle = '#fff';
+      const fontSize = Math.max(12, Math.min(16, this.radius / 12));
+      ctx.font = `600 ${fontSize}px 'Outfit', sans-serif`;
+      ctx.textBaseline = 'middle';
+      ctx.textAlign = 'center';
+      ctx.shadowColor = 'rgba(0,0,0,0.3)';
+      ctx.shadowBlur = 3;
+      
+      // Rotate text to follow the segment direction (radial)
+      ctx.rotate(midAngle);
+      
+      ctx.fillText(prize.name, 0, 0);
+      ctx.restore();
+    });
+    
+    // Add inner highlight
+    const innerHighlight = ctx.createRadialGradient(
+      centerX, centerY, 0,
+      centerX, centerY, this.radius * 0.3
+    );
+    innerHighlight.addColorStop(0, 'rgba(255,255,255,0.1)');
+    innerHighlight.addColorStop(1, 'transparent');
+    ctx.fillStyle = innerHighlight;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, this.radius, 0, 2 * Math.PI);
+    ctx.fill();
+    
+    this.needsRedraw = false;
   }
   
   setupEvents() {
@@ -326,6 +447,7 @@ class PhysicsWheel {
     
     window.addEventListener('resize', () => {
       this.setupCanvas();
+      this.createWheelCache();
       this.draw();
     });
   }
@@ -387,7 +509,8 @@ class PhysicsWheel {
     this.lastAngle = currentAngle;
     this.lastTime = currentTime;
     
-    if (navigator.vibrate && Math.abs(deltaAngle) > 0.05) {
+    // Reduce vibration frequency on mobile for better performance
+    if (navigator.vibrate && Math.abs(deltaAngle) > 0.1) {
       navigator.vibrate(1);
     }
   }
@@ -413,18 +536,27 @@ class PhysicsWheel {
   }
   
   startAnimation() {
-    const animate = () => {
-      this.update();
+    let lastTime = performance.now();
+    
+    const animate = (currentTime) => {
+      // Calculate delta time for frame-independent animation
+      const deltaTime = (currentTime - lastTime) / 1000;
+      lastTime = currentTime;
+      
+      this.update(deltaTime);
       this.draw();
       this.animationId = requestAnimationFrame(animate);
     };
-    animate();
+    
+    this.animationId = requestAnimationFrame(animate);
   }
   
-  update() {
+  update(deltaTime = 0.016) {
     if (!this.isDragging && Math.abs(this.angularVelocity) > this.minVelocity) {
-      this.angularVelocity *= this.friction;
-      this.rotation += this.angularVelocity * 0.016;
+      // Use actual delta time for smooth animation regardless of frame rate
+      const frictionFactor = Math.pow(this.friction, deltaTime * 60);
+      this.angularVelocity *= frictionFactor;
+      this.rotation += this.angularVelocity * deltaTime;
       
       const segmentAngle = (2 * Math.PI) / this.prizes.length;
       const normalized = ((this.rotation % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
@@ -460,75 +592,29 @@ class PhysicsWheel {
   
   draw() {
     const ctx = this.ctx;
-    const rect = this.canvas.getBoundingClientRect();
     
-    ctx.clearRect(0, 0, rect.width, rect.height);
+    ctx.clearRect(0, 0, this.displayWidth, this.displayHeight);
     
-    const segmentAngle = (2 * Math.PI) / this.prizes.length;
+    // Draw cached wheel with rotation transform
+    ctx.save();
+    ctx.translate(this.centerX, this.centerY);
+    ctx.rotate(this.rotation);
     
-    this.prizes.forEach((prize, i) => {
-      const startAngle = i * segmentAngle + this.rotation;
-      const endAngle = startAngle + segmentAngle;
-      const color = this.getColor(i);
-      
-      ctx.beginPath();
-      ctx.moveTo(this.centerX, this.centerY);
-      ctx.arc(this.centerX, this.centerY, this.radius, startAngle, endAngle);
-      ctx.closePath();
-      
-      ctx.fillStyle = color;
-      ctx.fill();
-      
-      ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      
-      ctx.save();
-      ctx.translate(this.centerX, this.centerY);
-      
-      const midAngle = startAngle + segmentAngle / 2;
-      const textRadius = this.radius * 0.65;
-      const textX = Math.cos(midAngle) * textRadius;
-      const textY = Math.sin(midAngle) * textRadius;
-      
-      const normalizedMid = ((midAngle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
-      const isLeftSide = normalizedMid > Math.PI / 2 && normalizedMid < 3 * Math.PI / 2;
-      
-      ctx.translate(textX, textY);
-      
-      ctx.fillStyle = '#fff';
-      const fontSize = Math.max(12, Math.min(16, this.radius / 12));
-      ctx.font = `600 ${fontSize}px 'Outfit', sans-serif`;
-      ctx.textBaseline = 'middle';
-      ctx.shadowColor = 'rgba(0,0,0,0.3)';
-      ctx.shadowBlur = 3;
-      
-      if (isLeftSide) {
-        ctx.rotate(midAngle + Math.PI);
-        ctx.textAlign = 'right';
-      } else {
-        ctx.rotate(midAngle);
-        ctx.textAlign = 'left';
-      }
-      
-      ctx.fillText(prize.name, 0, 0);
-      ctx.restore();
-    });
-    
-    const innerHighlight = ctx.createRadialGradient(
-      this.centerX, this.centerY, 0,
-      this.centerX, this.centerY, this.radius * 0.3
+    // Draw the cached wheel image
+    const halfSize = this.cacheSize / 2;
+    ctx.drawImage(
+      this.wheelCache,
+      0, 0, this.wheelCache.width, this.wheelCache.height,
+      -halfSize, -halfSize, this.cacheSize, this.cacheSize
     );
-    innerHighlight.addColorStop(0, 'rgba(255,255,255,0.1)');
-    innerHighlight.addColorStop(1, 'transparent');
-    ctx.fillStyle = innerHighlight;
-    ctx.beginPath();
-    ctx.arc(this.centerX, this.centerY, this.radius, 0, 2 * Math.PI);
-    ctx.fill();
+    
+    ctx.restore();
   }
   
   updatePrizes(newPrizes) {
     this.prizes = newPrizes;
+    this.needsRedraw = true;
+    this.drawWheelToCache();
     this.draw();
   }
   
@@ -745,7 +831,7 @@ async function init() {
   
   wheel.onSpinEnd = (winningIndex) => {
     const prize = prizes[winningIndex];
-    setTimeout(() => showResult(prize, winningIndex), 300);
+    setTimeout(() => showResult(prize, winningIndex), 100);
   };
   
   renderHistory();

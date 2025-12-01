@@ -1,6 +1,7 @@
 /**
  * Lucky Draw Wheel - Main Application
  * Physics-based spinning wheel with touch/mouse interaction
+ * Supports both D1 database (when deployed) and localStorage (fallback)
  */
 
 // Fresh color palette for wheel segments
@@ -29,7 +30,7 @@ const DEFAULT_PRIZES = [
   { name: '再来一次' },
 ];
 
-// Storage keys
+// Storage keys for localStorage fallback
 const STORAGE_KEYS = {
   PRIZES: 'lucky_draw_prizes',
   HISTORY: 'lucky_draw_history',
@@ -40,6 +41,129 @@ let prizes = [];
 let history = [];
 let wheel = null;
 let confetti = null;
+let useAPI = false; // Will be set to true if API is available
+
+/**
+ * API Functions - Try D1 database first, fallback to localStorage
+ */
+async function checkAPIAvailable() {
+  try {
+    const response = await fetch('/api/prizes', { method: 'GET' });
+    if (response.ok) {
+      useAPI = true;
+      console.log('Using D1 database for storage');
+      return true;
+    }
+  } catch (e) {
+    console.log('API not available, using localStorage');
+  }
+  useAPI = false;
+  return false;
+}
+
+async function loadPrizes() {
+  if (useAPI) {
+    try {
+      const response = await fetch('/api/prizes');
+      const result = await response.json();
+      if (result.success && result.data.length > 0) {
+        return result.data.map(p => ({ name: p.name }));
+      }
+    } catch (e) {
+      console.warn('Failed to load prizes from API:', e);
+    }
+  }
+  // Fallback to localStorage
+  return loadFromStorage(STORAGE_KEYS.PRIZES, JSON.parse(JSON.stringify(DEFAULT_PRIZES)));
+}
+
+async function savePrizesToDB(prizesData) {
+  if (useAPI) {
+    try {
+      const response = await fetch('/api/prizes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prizes: prizesData }),
+      });
+      const result = await response.json();
+      if (result.success) return true;
+    } catch (e) {
+      console.warn('Failed to save prizes to API:', e);
+    }
+  }
+  // Fallback to localStorage
+  saveToStorage(STORAGE_KEYS.PRIZES, prizesData);
+  return true;
+}
+
+async function loadHistory() {
+  if (useAPI) {
+    try {
+      const response = await fetch('/api/history');
+      const result = await response.json();
+      if (result.success) {
+        return result.data.map(h => ({
+          name: h.prize_name,
+          color: h.prize_color,
+          timestamp: new Date(h.created_at).getTime(),
+        }));
+      }
+    } catch (e) {
+      console.warn('Failed to load history from API:', e);
+    }
+  }
+  // Fallback to localStorage
+  return loadFromStorage(STORAGE_KEYS.HISTORY, []);
+}
+
+async function saveHistoryRecord(prizeName, prizeColor) {
+  if (useAPI) {
+    try {
+      const response = await fetch('/api/history', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prize_name: prizeName, prize_color: prizeColor }),
+      });
+      const result = await response.json();
+      if (result.success) return true;
+    } catch (e) {
+      console.warn('Failed to save history to API:', e);
+    }
+  }
+  // Fallback handled in addToHistory
+  return false;
+}
+
+async function clearHistoryFromDB() {
+  if (useAPI) {
+    try {
+      const response = await fetch('/api/history', { method: 'DELETE' });
+      const result = await response.json();
+      if (result.success) return true;
+    } catch (e) {
+      console.warn('Failed to clear history from API:', e);
+    }
+  }
+  // Fallback to localStorage
+  saveToStorage(STORAGE_KEYS.HISTORY, []);
+  return true;
+}
+
+async function resetPrizesToDefault() {
+  if (useAPI) {
+    try {
+      const response = await fetch('/api/prizes', { method: 'PUT' });
+      const result = await response.json();
+      if (result.success) {
+        return result.data.map(p => ({ name: p.name }));
+      }
+    } catch (e) {
+      console.warn('Failed to reset prizes from API:', e);
+    }
+  }
+  // Fallback
+  return JSON.parse(JSON.stringify(DEFAULT_PRIZES));
+}
 
 /**
  * Confetti Effect
@@ -81,26 +205,22 @@ class ConfettiEffect {
     this.isRunning = true;
     this.particles = [];
     
-    // Create initial particles
     for (let i = 0; i < 100; i++) {
       const p = this.createParticle();
       p.y = Math.random() * this.canvas.height * 0.5;
       this.particles.push(p);
     }
     
-    // Add more particles over time
     const spawnInterval = setInterval(() => {
       for (let i = 0; i < 5; i++) {
         this.particles.push(this.createParticle());
       }
     }, 50);
     
-    // Stop spawning after duration
     setTimeout(() => {
       clearInterval(spawnInterval);
     }, duration * 0.7);
     
-    // Stop animation after duration
     setTimeout(() => {
       this.stop();
     }, duration);
@@ -127,7 +247,7 @@ class ConfettiEffect {
       p.y += p.speedY;
       p.x += p.speedX;
       p.rotation += p.rotationSpeed;
-      p.speedY += 0.1; // gravity
+      p.speedY += 0.1;
       
       this.ctx.save();
       this.ctx.translate(p.x, p.y);
@@ -158,19 +278,16 @@ class PhysicsWheel {
     this.ctx = canvas.getContext('2d');
     this.prizes = prizes;
     
-    // Physics state
     this.rotation = 0;
     this.angularVelocity = 0;
     this.friction = 0.985;
     this.minVelocity = 0.001;
     
-    // Interaction state
     this.isDragging = false;
     this.lastAngle = 0;
     this.lastTime = 0;
     this.velocityHistory = [];
     
-    // Animation
     this.animationId = null;
     this.isSpinning = false;
     this.onSpinEnd = null;
@@ -354,22 +471,18 @@ class PhysicsWheel {
       const endAngle = startAngle + segmentAngle;
       const color = this.getColor(i);
       
-      // Draw segment
       ctx.beginPath();
       ctx.moveTo(this.centerX, this.centerY);
       ctx.arc(this.centerX, this.centerY, this.radius, startAngle, endAngle);
       ctx.closePath();
       
-      // Solid color fill
       ctx.fillStyle = color;
       ctx.fill();
       
-      // Border
       ctx.strokeStyle = 'rgba(255,255,255,0.5)';
       ctx.lineWidth = 2;
       ctx.stroke();
       
-      // Draw text
       ctx.save();
       ctx.translate(this.centerX, this.centerY);
       
@@ -402,7 +515,6 @@ class PhysicsWheel {
       ctx.restore();
     });
     
-    // Inner circle highlight
     const innerHighlight = ctx.createRadialGradient(
       this.centerX, this.centerY, 0,
       this.centerX, this.centerY, this.radius * 0.3
@@ -428,7 +540,7 @@ class PhysicsWheel {
 }
 
 /**
- * Storage utilities
+ * LocalStorage utilities (fallback)
  */
 function loadFromStorage(key, defaultValue) {
   try {
@@ -458,12 +570,10 @@ function showResult(prize, colorIndex) {
   prizeText.style.color = WHEEL_COLORS[colorIndex % WHEEL_COLORS.length];
   display.hidden = false;
   
-  // Start confetti
   if (confetti) {
     confetti.start(3500);
   }
   
-  // Add to history
   addToHistory(prize, colorIndex);
   
   if (navigator.vibrate) {
@@ -475,10 +585,16 @@ function hideResult() {
   document.getElementById('result-display').hidden = true;
 }
 
-function addToHistory(prize, colorIndex) {
+async function addToHistory(prize, colorIndex) {
+  const color = WHEEL_COLORS[colorIndex % WHEEL_COLORS.length];
+  
+  // Try to save to API
+  await saveHistoryRecord(prize.name, color);
+  
+  // Also update local state
   const record = {
     name: prize.name,
-    color: WHEEL_COLORS[colorIndex % WHEEL_COLORS.length],
+    color: color,
     timestamp: Date.now(),
   };
   
@@ -488,6 +604,7 @@ function addToHistory(prize, colorIndex) {
     history = history.slice(0, 50);
   }
   
+  // Save to localStorage as backup
   saveToStorage(STORAGE_KEYS.HISTORY, history);
   renderHistory();
 }
@@ -521,10 +638,10 @@ function renderHistory() {
   }).join('');
 }
 
-function clearHistory() {
+async function clearHistory() {
   if (confirm('确定要清空所有抽奖记录吗？')) {
+    await clearHistoryFromDB();
     history = [];
-    saveToStorage(STORAGE_KEYS.HISTORY, history);
     renderHistory();
   }
 }
@@ -588,21 +705,21 @@ function addPrize() {
   renderPrizeEditor();
 }
 
-function resetPrizes() {
+async function resetPrizes() {
   if (confirm('确定要恢复默认奖项设置吗？')) {
-    prizes = JSON.parse(JSON.stringify(DEFAULT_PRIZES));
+    prizes = await resetPrizesToDefault();
     renderPrizeEditor();
   }
 }
 
-function savePrizes() {
+async function savePrizes() {
   const valid = prizes.every(p => p.name.trim());
   if (!valid) {
     alert('请确保所有奖项都有名称');
     return;
   }
   
-  saveToStorage(STORAGE_KEYS.PRIZES, prizes);
+  await savePrizesToDB(prizes);
   wheel.updatePrizes(prizes);
   hideModal('modal-settings');
 }
@@ -610,9 +727,13 @@ function savePrizes() {
 /**
  * Initialize application
  */
-function init() {
-  prizes = loadFromStorage(STORAGE_KEYS.PRIZES, JSON.parse(JSON.stringify(DEFAULT_PRIZES)));
-  history = loadFromStorage(STORAGE_KEYS.HISTORY, []);
+async function init() {
+  // Check if API is available (for D1 database)
+  await checkAPIAvailable();
+  
+  // Load data
+  prizes = await loadPrizes();
+  history = await loadHistory();
   
   // Initialize confetti
   const confettiCanvas = document.getElementById('confetti-canvas');
@@ -633,7 +754,11 @@ function init() {
   // Event listeners
   document.getElementById('btn-close-result').addEventListener('click', hideResult);
   
-  document.getElementById('btn-history').addEventListener('click', () => {
+  document.getElementById('btn-history').addEventListener('click', async () => {
+    // Refresh history from DB when opening modal
+    if (useAPI) {
+      history = await loadHistory();
+    }
     renderHistory();
     showModal('modal-history');
   });
